@@ -1,0 +1,60 @@
+package com.luneruniverse.minecraft.mod.nbteditor.mixin;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+
+import com.luneruniverse.minecraft.mod.nbteditor.misc.MixinLink;
+import com.luneruniverse.minecraft.mod.nbteditor.multiversion.MVTextEvents;
+import com.luneruniverse.minecraft.mod.nbteditor.multiversion.Version;
+import com.luneruniverse.minecraft.mod.nbteditor.screens.ConfigScreen;
+import com.luneruniverse.minecraft.mod.nbteditor.screens.ImportScreen;
+import com.luneruniverse.minecraft.mod.nbteditor.screens.widgets.CreativeTabWidget;
+import com.luneruniverse.minecraft.mod.nbteditor.util.MainUtil;
+
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.GameMenuScreen;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.ingame.HandledScreen;
+import net.minecraft.client.gui.tooltip.TooltipComponent;
+import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.text.Style;
+
+@Mixin(Screen.class)
+public class ScreenMixin {
+	@Inject(method = "clearChildren", at = @At("RETURN"))
+	private void clearChildren(CallbackInfo info) {
+		CreativeTabWidget.addCreativeTabs((Screen) (Object) this);
+	}
+	@Inject(method = "init", at = @At("RETURN"), require = 0)
+	private void init(CallbackInfo info) {
+		Version.newSwitch()
+				.range("1.19.4", null, () -> CreativeTabWidget.addCreativeTabs((Screen) (Object) this))
+				.range(null, "1.19.3", () -> {})
+				.run();
+	}
+	
+	@Inject(method = "onFilesDropped", at = @At("HEAD"))
+	private void onFilesDropped(List<Path> paths, CallbackInfo info) {
+		Screen source = (Screen) (Object) this;
+		if (source instanceof HandledScreen || source instanceof GameMenuScreen)
+			ImportScreen.importFiles(paths, Optional.empty());
+	}
+	
+	@Inject(method = "handleTextClick(Lnet/minecraft/text/Style;)Z", at = @At("HEAD"), cancellable = true, require = 0)
+	private void handleTextClick(Style style, CallbackInfoReturnable<Boolean> info) {
+		if (style != null && style.getClickEvent() != null) {
+			MVTextEvents.ClickAction<?> clickAction = MVTextEvents.ClickAction.getAction(style.getClickEvent());
+			if (clickAction == MVTextEvents.ClickAction.OPEN_FILE &&
+					MixinLink.tryRunClickEvent(clickAction.getStringifiedValue(style.getClickEvent()))) {
+				info.setReturnValue(true);
+			}
+		}
+	}
+}

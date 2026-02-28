@@ -1,0 +1,79 @@
+package com.luneruniverse.minecraft.mod.nbteditor.nbtreferences.itemreferences;
+
+import com.luneruniverse.minecraft.mod.nbteditor.NBTEditorClient;
+import com.luneruniverse.minecraft.mod.nbteditor.clientchest.ClientChestHelper;
+import com.luneruniverse.minecraft.mod.nbteditor.clientchest.PageLoadLevel;
+import com.luneruniverse.minecraft.mod.nbteditor.screens.ConfigScreen;
+import com.luneruniverse.minecraft.mod.nbteditor.screens.containers.ClientChestScreen;
+import com.luneruniverse.minecraft.mod.nbteditor.util.MainUtil;
+import com.luneruniverse.minecraft.mod.nbteditor.util.SaveQueue;
+
+import net.minecraft.item.ItemStack;
+
+public class ClientChestItemReference implements ItemReference {
+	
+	private final int page;
+	private final int slot;
+	private final SaveQueue<ItemStack> save;
+	
+	public ClientChestItemReference(int page, int slot) {
+		this.page = page;
+		this.slot = slot;
+		
+		this.save = new SaveQueue<>("ClientChest/" + (page + 1) + "/" + slot, toSave -> {
+			ClientChestHelper.getPage(page, PageLoadLevel.DYNAMIC_ITEMS).join().ifPresent(pageData -> {
+				if (MainUtil.client.currentScreen instanceof ClientChestScreen screen && ClientChestScreen.PAGE == page)
+					screen.getScreenHandler().getSlot(slot).setStackNoCallbacks(toSave);
+				
+				pageData.getItemsOrThrow()[slot] = toSave;
+				pageData.dynamicItems().remove(slot);
+				ClientChestHelper.setPage(page, pageData.items(), pageData.dynamicItems()).join();
+			});
+		}, true);
+	}
+	
+	public int getPage() {
+		return page;
+	}
+	public int getSlot() {
+		return slot;
+	}
+	
+	@Override
+	public boolean exists() {
+		return page < NBTEditorClient.CLIENT_CHEST.getPageCount();
+	}
+	
+	@Override
+	public ItemStack getItem() {
+		return ClientChestHelper.getPage(page, PageLoadLevel.DYNAMIC_ITEMS).join().orElseThrow().getItemsOrThrow()[slot];
+	}
+	
+	@Override
+	public void saveItem(ItemStack toSave, Runnable onFinished) {
+		if (MainUtil.client.currentScreen instanceof ClientChestScreen && ClientChestScreen.PAGE == page)
+			((ClientChestScreen) MainUtil.client.currentScreen).getScreenHandler().getSlot(slot).setStackNoCallbacks(toSave);
+		save.save(onFinished, toSave.copy());
+	}
+	
+	@Override
+	public boolean isLocked() {
+		return ConfigScreen.isLockSlots();
+	}
+	
+	@Override
+	public boolean isLockable() {
+		return true;
+	}
+	
+	@Override
+	public int getBlockedSlot() {
+		return -1;
+	}
+	
+	@Override
+	public void showParent() {
+		ClientChestScreen.show();
+	}
+	
+}
