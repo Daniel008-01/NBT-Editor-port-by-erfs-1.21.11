@@ -1,6 +1,6 @@
 # NBT-Editor - 1.21.11
 
-omg i love 1.21.11 thanks thorioum
+
 
 This is a mod built for editing items, blocks, and entities in Minecraft.
 
